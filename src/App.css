@@ -15,6 +15,13 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: 'CustomInter';
+  src: url('/Inter.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+}
+
 @plugin "daisyui" {
   /* themes: light --default, dark --prefersdark; */
 
@@ -60,6 +67,7 @@
   @apply select-none transition-all duration-400; 
   /* font-family: "Poppins" , sans-serif; */
   font-weight: 400;
+  font-family: "CustomInter";
   font-style: normal;
 }
 
@@ -67,21 +75,43 @@ button {
   @apply fill-base-content font-extrabold;
 }
 
-svg {
-  @apply fill-base-content;
-}
-
 h1,
 p,
 th,
 tr {
-  @apply text-neutral-content;
+  @apply text-base-content;
 }
 
 h1 {
-  @apply text-xl font-extrabold;
+  @apply text-2xl uppercase;
+  font-weight: 700;
 }
 
 li p {
   @apply font-bold;
+}
+
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 300ms;
+  animation-timing-function: ease-in-out;
+}
+
+::view-transition-old(root) {
+  animation-name: fade-out;
+}
+
+::view-transition-new(root) {
+  animation-name: fade-in;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }

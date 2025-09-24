@@ -13,8 +13,10 @@
     "windows": [
       {
         "title": "tauri-credentials-app",
-        "width": 800,
-        "height": 600
+        "minWidth": 500,
+        "minHeight": 500,
+        "maxWidth": 500,
+        "maxHeight": 500
       }
     ],
     "security": {

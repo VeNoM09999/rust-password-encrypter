@@ -35,8 +35,6 @@ export default function BottomRight() {
 
     ctx.password_data.Setdata(payload_data);
     ctx.loader.password.Setloader(false);
-
-    setVal(payload_data.length);
   });
 
   onMount(() => {

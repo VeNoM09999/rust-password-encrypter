@@ -2,7 +2,6 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::encryption::encryt::{read_bytes, save_bytes, CustomData, CustomEncryption};
 
-// use crate::encryption::encryt::{CustomData, CustomEncryption};
 
 mod encryption;
 
@@ -37,6 +36,7 @@ fn onload(app: tauri::AppHandle) {
 
             if let Ok(d) = decrypted {
                 app.emit("init-load", &d).unwrap();
+                dbg!(&d);
             }
         }
         Err(_e) => {
