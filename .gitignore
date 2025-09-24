@@ -1,2 +1,4 @@
 node_modules
 dist
+/src-tauri/data.enc
+/src-tauri/key.bin
