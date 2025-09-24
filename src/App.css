@@ -1,0 +1,87 @@
+@import "tailwindcss";
+/* @import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"); */
+
+@font-face {
+  font-family: 'Bangers';
+  src: url('/Bangers/Bangers-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/Poppins/Poppins-Black.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+@plugin "daisyui" {
+  /* themes: light --default, dark --prefersdark; */
+
+  themes: all;
+}
+
+@plugin "daisyui/theme" {
+  name: "dark";
+  default: false;
+  prefersdark: false;
+  color-scheme: "dark";
+  --color-base-100: oklch(12% 0.042 264.695);
+  --color-base-200: oklch(20% 0.042 265.755);
+  --color-base-300: oklch(27% 0.041 260.031);
+  --color-base-content: oklch(96% 0.007 247.896);
+  --color-primary: oklch(86% 0.127 207.078);
+  --color-primary-content: oklch(30% 0.056 229.695);
+  --color-secondary: oklch(82% 0.12 346.018);
+  --color-secondary-content: oklch(28% 0.109 3.907);
+  --color-accent: oklch(84% 0.143 164.978);
+  --color-accent-content: oklch(26% 0.051 172.552);
+  --color-neutral: oklch(12% 0.042 264.695);
+  --color-neutral-content: oklch(98% 0.003 247.858);
+  --color-info: oklch(74% 0.16 232.661);
+  --color-info-content: oklch(29% 0.066 243.157);
+  --color-success: oklch(77% 0.152 181.912);
+  --color-success-content: oklch(27% 0.046 192.524);
+  --color-warning: oklch(85% 0.199 91.936);
+  --color-warning-content: oklch(28% 0.066 53.813);
+  --color-error: oklch(71% 0.202 349.761);
+  --color-error-content: oklch(28% 0.109 3.907);
+  --radius-selector: 0rem;
+  --radius-field: 1rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1.5px;
+  --depth: 0;
+  --noise: 0;
+}
+
+* {
+  @apply select-none transition-all duration-400; 
+  /* font-family: "Poppins" , sans-serif; */
+  font-weight: 400;
+  font-style: normal;
+}
+
+button {
+  @apply fill-base-content font-extrabold;
+}
+
+svg {
+  @apply fill-base-content;
+}
+
+h1,
+p,
+th,
+tr {
+  @apply text-neutral-content;
+}
+
+h1 {
+  @apply text-xl font-extrabold;
+}
+
+li p {
+  @apply font-bold;
+}
