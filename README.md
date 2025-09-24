@@ -8,7 +8,7 @@
 
 SecurePass is a cross platform desktop password manager built with [Tauri](https://tauri.app/) for secure, local encrypted storage of your passwords. It leverages advanced cryptographic techniques to keep your credentials safe and private, all without relying on cloud storage.
 
-[Tauri App Screenshot](https://raw.githubusercontent.com/username/repo/branch/path/to/image.png)
+![[BETA] App UI Screenshot](https://raw.githubusercontent.com/VeNoM09999/rust-password-encrypter/simpleUi/UI.png)
 ---
 
 ## Features
