@@ -1,9 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 import { CustomContextProvider } from "./store/sharedState";
-import { A } from "@solidjs/router";
 import { JSXElement } from "solid-js";
-import NavLink from "./components/NavLink";
 
 function App(props: { children: JSXElement }) {
   return (

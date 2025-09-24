@@ -1,64 +1,81 @@
-import { IoAddCircle, IoBagOutline as Shopping } from "solid-icons/io";
+import { IoAdd } from "solid-icons/io";
+import { AiOutlineRight as Right, AiOutlineDelete } from "solid-icons/ai";
+
+import { IoBagOutline as Shopping } from "solid-icons/io";
 import { FiInstagram as Social } from "solid-icons/fi";
-import {
-  AiOutlineRight as Right,
-  AiOutlineCloud as Cloud,
-} from "solid-icons/ai";
+import { AiOutlineCloud as Cloud } from "solid-icons/ai";
 import { FiMail as Mail } from "solid-icons/fi";
 import { IoPlayOutline as Streaming } from "solid-icons/io";
 import { BsGlobe as Other } from "solid-icons/bs";
 
-import { createSignal, For, onMount, useContext } from "solid-js";
+import { For, onMount, useContext } from "solid-js";
 import {
   CustomContext,
   CustomContextType,
+  FilteredByServices,
   KeyValueType,
   RustKeyValue,
 } from "../store/sharedState";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import NavLink from "./NavLink";
+import { KnownCategories } from "../store/constant";
+
+function FilterPasswordByCategory(val: KeyValueType[]): FilteredByServices {
+  let filtered: FilteredByServices = {
+    other: [],
+    cloud: [],
+    mail: [],
+    shopping: [],
+    social: [],
+    streaming: [],
+  };
+  val.forEach((item) => {
+    switch (item.service.toLowerCase()) {
+      case "discord":
+        filtered.social.push(item);
+        break;
+      case "netflix":
+        filtered.streaming.push(item);
+        break;
+
+      case "google":
+        filtered.mail.push(item);
+        break;
+        
+      default:
+        filtered.other.push(item);
+    }
+  });
+
+  return filtered;
+}
 
 export default function FirstPage() {
   const ctx = useContext(CustomContext) as CustomContextType;
 
-  const knownService = [
-    { service: "other", svg: <Other class="w-full h-full" /> },
-    { service: "discord", svg: <Social class="w-full h-full" /> },
-    { service: "netflix", svg: <Streaming class="w-full h-full" /> },
-  ];
-
-  const knownCategory = [
-    { category: "other", svg: <Other class="w-full h-full" /> },
-    {
-      category: "Social",
-      svg: <Social class="w-full h-full" />,
-    },
-    {
-      category: "Streaming",
-      svg: <Streaming class="w-full h-full" />,
-    },
-    {
-      category: "Email",
-      svg: <Mail class="w-full h-full" />,
-    },
-    {
-      category: "Cloud",
-      svg: <Cloud class="w-full h-full" />,
-    },
-  ];
-
-  function getSvgForSerice(service: string) {
-    const serviceItem = knownService.find(
-      (item) => item.service === service.toLocaleLowerCase()
-    );
-    return serviceItem ? serviceItem.svg : knownService[0].svg;
+  function getSvgForCategory(category: string) {
+    switch (category) {
+      case "Social":
+        return <Social class="w-full h-full" />;
+      case "Streaming":
+        return <Streaming class="w-full h-full" />;
+      case "Email":
+        return <Mail class="w-full h-full" />;
+      case "Cloud":
+        return <Cloud class="w-full h-full" />;
+      case "Shopping":
+        return <Shopping class="w-full h-full" />;
+      default:
+        return <Other class="w-full h-full" />;
+    }
   }
 
   listen<RustKeyValue[]>("init-load", (event) => {
-    let converted = convert_from_rust_struct(event.payload);
+    const converted = convert_from_rust_struct(event.payload);
     console.log(converted);
-    ctx.password_data.Setdata(converted);
+    const filtered = FilterPasswordByCategory(converted);
+    ctx.filtered_password_data.Setdata(filtered);
   });
 
   onMount(() => {
@@ -73,16 +90,12 @@ export default function FirstPage() {
     }
     const returnVal: KeyValueType[] = data.map((val) => ({
       service: val.key,
+      email: val.email,
       password: val.value,
     }));
     return returnVal;
   }
 
-  function copy(password: string) {
-    navigator.clipboard.writeText(password);
-  }
-
-  const [hoveredRow, setHoveredRow] = createSignal(-1);
   return (
     <>
       <div class="w-full">
@@ -90,28 +103,25 @@ export default function FirstPage() {
           <li class="list-row">
             <h1>Password Manager</h1>
           </li>
-          <For each={ctx?.password_data.getdata()}>
-            {(item, index) => (
+          <For each={KnownCategories}>
+            {(item, _index) => (
               <li class="flex list-row place-content-center items-center">
-                <div class="h-10 w-10">{getSvgForSerice(item.service)}</div>
-                <h2 class="font-semibold text-2xl">{item.service}</h2>
+                <div class="fill-black w-10 h-10">
+                  {getSvgForCategory(item.Icon)}
+                </div>
+                <h2 class="font-semibold text-2xl">{item.category}</h2>
+                <p>
+                  {
+                    // Safely access filtered data array length by Icon string key (e.g. 'mail', 'shopping')
+                    ctx.filtered_password_data.getdata()
+                      ? ctx.filtered_password_data.getdata()[
+                          item.Icon.toLowerCase() as keyof FilteredByServices
+                        ].length
+                      : 0
+                  }
+                </p>
                 <div class="ml-auto flex space-x-5 place-content-center items-center">
-                  <p
-                    tabIndex={0}
-                    onMouseEnter={() => setHoveredRow(index())}
-                    onMouseLeave={() => setHoveredRow(-1)}
-                    class="blur-[1.5px] hover:blur-none transition-none duration-75"
-                    onClick={() => copy(item.password)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        copy(item.password);
-                      }
-                    }}
-                  >
-                    {hoveredRow() == index() ? item.password : "•••••••••••••"}
-                  </p>
-                  <NavLink to={`/edit/${item.service}`}>
+                  <NavLink to={`/category/${item.category}`}>
                     <div
                       tabindex={0}
                       role="button"
@@ -126,29 +136,31 @@ export default function FirstPage() {
           </For>
         </ul>
       </div>
-      <div class="fab fab-flower">
+      <div class="fab">
         {/* a focusable div with tabIndex is necessary to work on all browsers. role="button" is necessary for accessibility */}
-        <div tabIndex={0} role="button" class="btn btn-lg btn-ghost btn-circle">
-          <IoAddCircle class="w-10 h-full" />
+        <div tabIndex={0} role="button" class="btn btn-lg btn-circle btn-info">
+          <IoAdd />
         </div>
 
-        {/* Main Action button replaces the original button when FAB is open */}
-        <button class="fab-main-action btn btn-circle btn-lg btn-success">
-          M
-        </button>
+        {/* close button should not be focusable so it can close the FAB when clicked. It's just a visual placeholder */}
+        <div class="fab-close">
+          Close <span class="btn btn-circle btn-lg btn-error">✕</span>
+        </div>
 
         {/* buttons that show up when FAB is open */}
-        <div class="tooltip tooltip-left" data-tip="Label A">
-          <button class="btn btn-lg btn-circle">A</button>
+        <div>
+          Create New
+          <NavLink to="/create">
+            <button class="btn btn-lg btn-circle">
+              <IoAdd />
+            </button>
+          </NavLink>
         </div>
-        <div class="tooltip tooltip-left" data-tip="Label B">
-          <button class="btn btn-lg btn-circle">B</button>
-        </div>
-        <div class="tooltip" data-tip="Label C">
-          <button class="btn btn-lg btn-circle">C</button>
-        </div>
-        <div class="tooltip" data-tip="Label D">
-          <button class="btn btn-lg btn-circle">D</button>
+        <div>
+          Delete Selected
+          <button class="btn btn-lg btn-circle">
+            <AiOutlineDelete />
+          </button>
         </div>
       </div>
     </>

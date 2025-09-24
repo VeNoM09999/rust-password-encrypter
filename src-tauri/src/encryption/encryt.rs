@@ -23,6 +23,7 @@ pub enum EncryptionFile {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CustomData {
     pub key: String,
+    pub email: String,
     pub value: String,
 }
 

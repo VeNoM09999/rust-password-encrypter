@@ -52,6 +52,8 @@ fn onload(app: tauri::AppHandle) {
 
 #[tauri::command]
 fn onsave(app: tauri::AppHandle, plaintext: &str) -> bool {
+    // dbg!(plaintext);
+    // true
     let encrypt = CustomEncryption::read();
 
     let encrypted_data = match encrypt.encrypt(plaintext.as_bytes()) {
