@@ -2,99 +2,159 @@ import {
     Button,
     ScrollView,
     VerticalBox,
+    StandardTableView,
+    ListView,
+    CheckBox,
+    TextEdit,
+    LineEdit,
 } from "std-widgets.slint";
+import {
+    TextButton,
+    MaterialWindow,
+    Modal,
+    PopupMenu,
+    Vertical,
+    Horizontal,
+    HorizontalDivider,
+} from "../material.slint";
+import { ModalWindow } from "modal-window.slint";
+import { CredsStruct, UIGlobal } from "global.slint";
+import { TextField } from "components/text_field.slint";
+
+
+component Space inherits Rectangle {
+    height: 100px;
+}
 
 component CredsComponentSidebar inherits Rectangle {
     border-width: 2px;
     border-color: #565656;
-    border-radius: 10px;
+    border-radius: 4px;
+    in property <string> VaultName;
     VerticalLayout {
         padding: 10px;
         Text {
-            text: "Vault Name";
-            color: #ffffff;
+            text: root.VaultName;
         }
     }
 }
 
-component CredsComponent inherits Rectangle {
-    border-width: 2px;
-    border-color: #565656;
-    border-radius: 10px;
-    VerticalLayout {
-        padding: 10px;
-        Text {
-            text: "Name: ";
-            color: #ffffff;
+component CredsComponent inherits ListView {
+    callback copy_requested(id: string);
+    // in property <[CredsStruct]> items: [{ name: "Discord", password: "Password" }];
+    in property <color> color;
+
+    for item in UIGlobal.creds: HorizontalLayout {
+        CheckBox {
+            toggled => {
+                copy_requested(item.id);
+                // ! >> Callback to Rust Code >>
+            }
+            text: item.name;
         }
 
         Text {
-            text: "Value: ";
-            color: #ffffff;
+            text: item.password;
         }
     }
 }
 
-export component AppWindow inherits Window {
-    // width: 700px;
-    height: 450px;
-    background: #1e1e1e;
-    HorizontalLayout { 
+export { UIGlobal }
+
+export component AppWindow inherits MaterialWindow {
+    preferred-width: 500px;
+    always-on-top: false;
+    disable-hover: false;
+    preferred-height: 450px;
+    title: "Credentials";
+    in-out property <bool> showModal: false;
+    in property <color> r_color;
+    HorizontalLayout {
+        max-width: parent.preferred-width;
+        padding: 20px;
         // Sidebar
         Rectangle {
             width: 170px;
-            // min-width: 100px;
-            background: #252525;
             layout := VerticalLayout {
                 alignment: start;
                 padding: 16px;
                 spacing: 20px;
+
                 Text {
-                    text: "Vault";
-                    font-size: 26px;
-                    color: #ffffff;
+                    text: "Your Vaults";
+                    font-size: 24px;
                     font-weight: 600;
                 }
 
-                Button {
-                    text: "+ Add";
-                    primary: true;
-                    clicked => {
-                        // layout.padding += 12px;
-                    }
+                TextButton {
+                    text: "+ Add Vault";
+                    // primary: true;
+                    // clicked => {
+                    //     // layout.padding += 12px;
+                    // }
                 }
 
-                CredsComponentSidebar { }
+                VerticalLayout {
+                    spacing: 10px;
+                    CredsComponentSidebar {
+                        VaultName: "Personal";
+                    }
+
+                    CredsComponentSidebar {
+                        VaultName: "Office";
+                    }
+                }
             }
         }
 
         // Main Content
         Rectangle {
-            background: #1e1e1e;
+            border-width: 2px;
+            border-color: #565656;
+            border-radius: 10px;
             VerticalLayout {
-                padding: 16px;
+                height: parent.height;
+                padding-left: 16px;
+                padding-right: 16px;
                 spacing: 12px;
-                Text {
-                    text: "Credentials";
-                    font-size: 22px;
-                    color: #ffffff;
+                alignment: start;
+
+                Space {
+                    height: 10px;
                 }
 
-                ScrollView {
-                    viewport-height: parent.height - 60px;
-                    VerticalLayout {
-                        spacing: 8px;
-                        // Creds Card Here
-                        CredsComponent { }
+                HorizontalLayout {
+                    alignment: start;
+                    spacing: 10px;
+                    Text {
+                        text: "Credentials";
+                        font-size: 22px;
+                    }
 
-                        CredsComponent { }
-
-                        CredsComponent { }
-
-                        CredsComponent { }
+                    TextButton {
+                        text: "+";
+                        width: 10%;
+                        clicked => {
+                            modal.visible = true;
+                        }
                     }
                 }
+
+                CredsComponent {
+                    color: root.r_color;
+                    height: 100%;
+                    copy_requested(id) => {
+                        UIGlobal.cb_copy(id);
+                    }
+                }
+
+                Space { }
             }
         }
+    }
+
+    modal := ModalWindow {
+        opacity: 1;
+        visible: true;
     }
 }

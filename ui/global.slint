@@ -1,0 +1,16 @@
+export struct CredsStruct {
+    id: string,
+    name: string,
+    password: string,
+    email_username: string,
+    website_url: string
+}
+
+export global UIGlobal {
+
+    in property <[CredsStruct]> creds;
+    pure callback add_new_entry(CredsStruct: CredsStruct);
+    pure callback cb_copy(id: string);
+    pure callback save();
+    in-out property <string> status: "alive";
+}

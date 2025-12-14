@@ -1,0 +1,75 @@
+import {
+    Button,
+    LineEdit,
+    VerticalBox,
+    HorizontalBox,
+} from "std-widgets.slint";
+import { UIGlobal } from "global.slint";
+import { PopupMenu } from "../material.slint";
+import {
+    ModalDrawer,
+    MaterialWindow,
+    Modal,
+    HorizontalDivider,
+    TextButton,
+    ElevatedButton,
+} from "../material.slint";
+import { BaseDialog } from "components/dialog.slint";
+import { TextField } from "components/text_field.slint";
+
+export component ModalWindow inherits Modal {
+    in-out property <bool> password_visible: true;
+    in-out property <string> service_password_value: "SuperStrongPassword";
+    in-out property <string> service_url: "";
+    in-out property <string> service_email_username: "";
+    VerticalBox {
+        alignment: center;
+        // spacing: 20px;
+        username_email := TextField {
+            transform-scale: 0.85;
+            transform-scale-x: 1;
+            label: "Email/Username";
+            placeholder_text: "Enter your email/username";
+            has_error: false;
+        }
+
+        password := TextField {
+            transform-scale: 0.85;
+            transform-scale-x: 1;
+            label: "Password";
+            placeholder_text: "Enter your password";
+        }
+
+        service := TextField {
+            transform-scale: 0.85;
+            transform-scale-x: 1;
+            label: "Service URL";
+            placeholder_text: "Enter Serice/Website URL";
+        }
+
+        HorizontalBox {
+
+            ElevatedButton {
+                text: "Save";
+                clicked => {
+                    root.visible = false;
+                    UIGlobal.add_new_entry({
+                        id: username_email.text,
+                        name: username_email.text,
+                        password: password.text,
+                        email_username: username_email.text,
+                        website_url:service.text
+                    })
+                }
+            }
+
+            TextButton {
+                text: "Cancel";
+
+                clicked => {
+                    root.visible = false;
+                }
+            }
+        }
+    }
+}
