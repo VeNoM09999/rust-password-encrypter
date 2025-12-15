@@ -3,8 +3,7 @@ export struct CredsStruct {
     name: string,
     password: string,
     email_username: string,
-    website_url: string
-}
+    website_url: string}
 
 export global UIGlobal {
 
@@ -12,5 +11,6 @@ export global UIGlobal {
     pure callback add_new_entry(CredsStruct: CredsStruct);
     pure callback cb_copy(id: string);
     pure callback save();
+    pure callback load();
     in-out property <string> status: "alive";
 }

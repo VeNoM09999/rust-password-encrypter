@@ -13,6 +13,7 @@ import {
     HorizontalDivider,
     TextButton,
     ElevatedButton,
+    FilledButton,
 } from "../material.slint";
 import { BaseDialog } from "components/dialog.slint";
 import { TextField } from "components/text_field.slint";
@@ -23,9 +24,11 @@ export component ModalWindow inherits Modal {
     in-out property <string> service_url: "";
     in-out property <string> service_email_username: "";
     VerticalBox {
+        padding: 20px;
         alignment: center;
         // spacing: 20px;
         username_email := TextField {
+            text <=> service_email_username;
             transform-scale: 0.85;
             transform-scale-x: 1;
             label: "Email/Username";
@@ -34,6 +37,7 @@ export component ModalWindow inherits Modal {
         }
 
         password := TextField {
+            text <=> service_password_value;
             transform-scale: 0.85;
             transform-scale-x: 1;
             label: "Password";
@@ -41,6 +45,7 @@ export component ModalWindow inherits Modal {
         }
 
         service := TextField {
+            text <=> service_url;
             transform-scale: 0.85;
             transform-scale-x: 1;
             label: "Service URL";
@@ -49,8 +54,11 @@ export component ModalWindow inherits Modal {
 
         HorizontalBox {
 
-            ElevatedButton {
+            FilledButton {
                 text: "Save";
+                width: 120px;
+                tooltip: "Save entry";
+                // height: 80px;
                 clicked => {
                     root.visible = false;
                     UIGlobal.add_new_entry({
@@ -65,6 +73,7 @@ export component ModalWindow inherits Modal {
 
             TextButton {
                 text: "Cancel";
+                tooltip: "discard entry";
 
                 clicked => {
                     root.visible = false;

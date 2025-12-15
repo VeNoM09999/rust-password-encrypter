@@ -1,136 +1,150 @@
-#![allow(dead_code, unused_variables)]
-
-use slint::{Color, ComponentHandle, ModelRc, SharedString, VecModel};
+// #![allow(dead_code, unused_variables)]
+use serde::{Deserialize, Serialize};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock, mpsc},
-    thread::{self},
-    vec,
+    fs::{File, exists},
+    io::Write,
+    rc::Rc,
+    sync::{Arc, Mutex},
 };
 
+use crate::encrypt::encryt::CustomEncryption;
+mod encrypt;
+
 slint::include_modules!();
-enum AppCommands {
-    Save,
-    Update(CredsStruct),
-    Insert(CredsStruct),
-}
 
 pub struct CredsState {
-    pub data: RwLock<HashMap<String, CredsStruct>>,
+    // pub data: Mutex<HashMap<String, CredsStruct>>,
+    pub has_been_edited: bool,
+    pub encrypter: Mutex<CustomEncryption>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CredsStructDTO {
+    pub id: String,
+    pub name: String,
+    pub password: String,
+    pub email_username: String,
+    pub website_url: String,
+}
+
+impl From<&CredsStruct> for CredsStructDTO {
+    fn from(value: &CredsStruct) -> Self {
+        Self {
+            id: value.id.clone().into(),
+            name: value.name.clone().into(),
+            password: value.password.clone().into(),
+            email_username: value.email_username.clone().into(),
+            website_url: value.website_url.clone().into(),
+        }
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let loaded_from_json: Vec<CredsStruct> = vec![
-        CredsStruct {
-            id: "discord".into(),
-            name: "Discord".into(),
-            password: "discordpassword".into(),
-            email_username: "".into(),
-            website_url: "discord.com".into(),
-        },
-        CredsStruct {
-            id: "google".into(),
-            name: "Google".into(),
-            password: "googlepassword".into(),
-            email_username: "".into(),
-            website_url: "gmail.com".into(),
-        },
-        CredsStruct {
-            id: "netflix".into(),
-            name: "Netflix".into(),
-            password: "NetflixPassword".into(),
-            email_username: "".into(),
-            website_url: "netflix.com".into(),
-        },
-    ];
+    let encryption = CustomEncryption::read();
 
-    let hashed: HashMap<String, CredsStruct> = loaded_from_json
-        .iter()
-        .map(|v| (v.id.to_string(), v.clone()))
-        .collect();
-    let arw_hash_map = RwLock::new(hashed);
-
-    // Atomic States
-    let app_state = CredsState { data: arw_hash_map };
+    // Business Atomic States
+    let app_state = CredsState {
+        has_been_edited: false,
+        encrypter: Mutex::new(encryption),
+    };
     let shared_state = Arc::new(app_state);
-    let state_for_channel = generate_mutex_clone(&shared_state);
-    let state_for_savecb = generate_mutex_clone(&shared_state);
 
     // UI HANDLES
     let ui = AppWindow::new()?;
-    let ui_weak_thread = ui.as_weak();
-    let cloned_ui_thread = ui_weak_thread.clone();
 
-    // Update channel for UI
-    let (update_tx_channel, update_rx_channel) = mpsc::channel::<AppCommands>();
-    let channel_add_entry_clone = update_tx_channel.clone();
+    let creds_modal = Rc::new(VecModel::from(Vec::<CredsStruct>::new()));
+    ui.global::<UIGlobal>()
+        .set_creds(ModelRc::from(creds_modal.clone()));
 
-    thread::spawn(move || {
-        loop {
-            if let Some(appcommands) = update_rx_channel.recv().ok() {
-                let mut m_state = state_for_channel.data.write().unwrap();
-                match appcommands {
-                    AppCommands::Save => {
-                        //  TODO  >> Disk Saving Logic here OR maybe on network
-                    }
-                    AppCommands::Insert(creds) => {
-                        let _ = m_state.insert(creds.id.to_string(), creds.clone());
+    {
+        ui.global::<UIGlobal>().on_save({
+            let cloned = shared_state.clone();
+            let ui_weak = ui.as_weak();
+            move || {
+                if let Some(ui_strong) = ui_weak.upgrade() {
+                    let data = ui_strong.global::<UIGlobal>().get_creds();
 
-                        let vec_state: Vec<CredsStruct> =
-                            m_state.iter().map(|v| v.1.clone()).collect();
-                        let c2 = cloned_ui_thread.clone();
-                        slint::invoke_from_event_loop(move || {
-                            if let Some(upgraded_ui) = c2.upgrade() {
-                                println!("Setting new UI State");
-                                upgraded_ui
-                                    .global::<UIGlobal>()
-                                    .set_creds(ModelRc::new(VecModel::from(vec_state)));
-                                upgraded_ui.set_r_color(Color::from_argb_encoded(323));
-                            }
-                        })
-                        .unwrap();
-                    }
-                    AppCommands::Update(newcreds) => {
-                        // TODO >> Update the current entry of the credentials
+                    let creds: Vec<CredsStructDTO> =
+                        data.iter().map(|f| CredsStructDTO::from(&f)).collect();
+
+                    let serialized = serde_json::to_vec(&creds).unwrap();
+                    let encrypted_bytes = cloned
+                        .encrypter
+                        .lock()
+                        .expect("Failed to acquire lock on encryptor")
+                        .encrypt(serialized.as_slice()); // As Slice of Bytes
+                    if std::path::Path::new("data.enc").is_file() {
+                        let mut file_handle =
+                            File::open("data.enc").expect("Failed to find the encrypted_file");
+                        file_handle.write_all(&encrypted_bytes);
+                        file_handle.flush();
+                    } else {
+                        let mut file_handle =
+                            File::create("data.enc").expect("failed to create file in fs");
+                        file_handle.write_all(&encrypted_bytes);
+                        file_handle.flush();
                     }
                 }
-            };
-        }
-    });
+            }
+        });
+    }
+    {
+        ui.global::<UIGlobal>().on_load({
+            let cloned_app_state = Arc::clone(&shared_state);
+            let creds_model_clone = creds_modal.clone();
+            move || {
+                if let Ok(_) = exists("data.enc") {
+                    let mut new_encrypter = CustomEncryption::read();
+                    new_encrypter.decrypt();
+                    let mut old_encryptor = cloned_app_state.encrypter.lock().unwrap();
+                    *old_encryptor = new_encrypter;
 
-    ui.global::<UIGlobal>().on_save(move || {
-        let _ = update_tx_channel.send(AppCommands::Save);
-    });
+                    if let Some(decrypted) = &old_encryptor.decrypted {
+                        let slint_creds: Vec<CredsStruct> = decrypted
+                            .iter()
+                            .map(|f| CredsStruct {
+                                email_username: f.email_username.clone().into(),
+                                id: f.id.clone().into(),
+                                name: f.name.clone().into(),
+                                password: f.password.clone().into(),
+                                website_url: f.website_url.clone().into(),
+                            })
+                            .collect();
+                        creds_model_clone.set_vec(slint_creds);
+                    }
+                }
+            }
+        });
+    }
 
-    ui.global::<UIGlobal>().on_cb_copy(move |id: SharedString| {
-        let cloned = shared_state.clone();
-        println!("Id to copy password for : {id}");
-        let unlocked = cloned.data.read().unwrap();
+    {
+        ui.global::<UIGlobal>().on_cb_copy({
+            let cloned = Arc::clone(&shared_state);
+            move |id: SharedString| {
+                println!("Id to copy password for : {id}");
+            }
+        });
+    }
 
-        if let Some(item) = unlocked.get(id.as_str()) {
-            println!(
-                "Service Name : {} \nService Password: {}",
-                item.name, item.password
-            )
-        }
-    });
+    {
+        ui.global::<UIGlobal>().on_add_new_entry({
+            let creds_cloned = creds_modal.clone();
+            // let cloned = Arc::clone(&shared_state);
+            move |entry| {
+                // let ui_handle = ui_handle.clone();
+                println!("{entry:#?}");
+                if entry.email_username.is_empty() && entry.password.is_empty() {
+                    return;
+                }
+                let c2 = creds_cloned.clone();
+                let _ = slint::spawn_local(async move {
+                    c2.push(entry);
+                });
+            }
+        });
+    }
 
-    ui.global::<UIGlobal>().on_add_new_entry(move |entry| {
-        println!("{entry:#?}");
-        let state = state_for_savecb
-            .data
-            .read()
-            .expect("Failed to lock the ARC");
-        channel_add_entry_clone
-            .send(AppCommands::Insert(entry))
-            .expect("Channel is closed!");
-    });
-
-    // ui.set_items(ModelRc::new(VecModel::from(loaded_from_json)));
-    let _ = ui.run();
+    ui.run().expect("failed to run slint ui window");
     Ok(())
-}
-
-fn generate_mutex_clone<T>(data: &Arc<T>) -> Arc<T> {
-    Arc::clone(data)
 }

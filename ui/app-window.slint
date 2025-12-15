@@ -7,6 +7,9 @@ import {
     CheckBox,
     TextEdit,
     LineEdit,
+    TabWidget,
+    VerticalBox,
+    HorizontalBox,
 } from "std-widgets.slint";
 import {
     TextButton,
@@ -16,10 +19,23 @@ import {
     Vertical,
     Horizontal,
     HorizontalDivider,
+    OutlinedCard,
+    ElevatedCard,
+    FilledCard,
+    ListTile,
+    ModalDrawer,
+    NavigationRail,
+    ElevatedButton,
+    FilledButton,
+    NavigationBar,
+    SmallAppBar,
+    AppBar,
+    TabBar,
 } from "../material.slint";
 import { ModalWindow } from "modal-window.slint";
 import { CredsStruct, UIGlobal } from "global.slint";
 import { TextField } from "components/text_field.slint";
+import { NavigationDrawer } from "components/navigation_drawer.slint";
 
 
 component Space inherits Rectangle {
@@ -68,50 +84,11 @@ export component AppWindow inherits MaterialWindow {
     preferred-height: 450px;
     title: "Credentials";
     in-out property <bool> showModal: false;
-    in property <color> r_color;
-    HorizontalLayout {
+    VerticalBox {
         max-width: parent.preferred-width;
         padding: 20px;
-        // Sidebar
-        Rectangle {
-            width: 170px;
-            layout := VerticalLayout {
-                alignment: start;
-                padding: 16px;
-                spacing: 20px;
-
-                Text {
-                    text: "Your Vaults";
-                    font-size: 24px;
-                    font-weight: 600;
-                }
-
-                TextButton {
-                    text: "+ Add Vault";
-                    // primary: true;
-                    // clicked => {
-                    //     // layout.padding += 12px;
-                    // }
-                }
-
-                VerticalLayout {
-                    spacing: 10px;
-                    CredsComponentSidebar {
-                        VaultName: "Personal";
-                    }
-
-                    CredsComponentSidebar {
-                        VaultName: "Office";
-                    }
-                }
-            }
-        }
-
         // Main Content
-        Rectangle {
-            border-width: 2px;
-            border-color: #565656;
-            border-radius: 10px;
+        FilledCard {
             VerticalLayout {
                 height: parent.height;
                 padding-left: 16px;
@@ -131,17 +108,33 @@ export component AppWindow inherits MaterialWindow {
                         font-size: 22px;
                     }
 
-                    TextButton {
-                        text: "+";
-                        width: 10%;
+                    FilledButton {
+                        text: "New";
+                        // width: 10%;
                         clicked => {
                             modal.visible = true;
+                            modal.service_url = "";
+                            modal.service_password_value = "";
+                            modal.service_email_username = "";
+                        }
+                    }
+
+                    FilledButton {
+                        clicked => {
+                            UIGlobal.load();
+                        }
+                        text: "Load";
+                    }
+
+                    FilledButton {
+                        text: "Save";
+                        clicked => {
+                            UIGlobal.save();
                         }
                     }
                 }
 
                 CredsComponent {
-                    color: root.r_color;
                     height: 100%;
                     copy_requested(id) => {
                         UIGlobal.cb_copy(id);
@@ -154,7 +147,6 @@ export component AppWindow inherits MaterialWindow {
     }
 
     modal := ModalWindow {
-        opacity: 1;
         visible: true;
     }
 }
