@@ -109,7 +109,7 @@ export component AppWindow inherits MaterialWindow {
                     }
 
                     FilledButton {
-                        text: "New";
+                        text: "+ Creds";
                         // width: 10%;
                         clicked => {
                             modal.visible = true;
@@ -120,14 +120,21 @@ export component AppWindow inherits MaterialWindow {
                     }
 
                     FilledButton {
+                        text: "New Vault";
                         clicked => {
-                            UIGlobal.load();
+                            UIGlobal.new_vault();
                         }
-                        text: "Load";
                     }
 
                     FilledButton {
-                        text: "Save";
+                        clicked => {
+                            UIGlobal.load();
+                        }
+                        text: "Load Vault";
+                    }
+
+                    FilledButton {
+                        text: "Save Vault";
                         clicked => {
                             UIGlobal.save();
                         }

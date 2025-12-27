@@ -1,6 +1,9 @@
+use anyhow::{Context, Result};
 use std::{
+    any,
     fs::{self, File},
     io::Write,
+    path::PathBuf,
 };
 
 use aes_gcm::{
@@ -17,10 +20,31 @@ use crate::CredsStructDTO;
 //     pub value: String,
 // }
 
+enum EncryptorFileTypes {
+    DataFile,
+    KeyFile,
+}
+
+enum EncrypterErrors {
+    SavingError,
+}
+
+impl From<EncrypterErrors> for anyhow::Error {
+    fn from(value: EncrypterErrors) -> Self {
+        anyhow::anyhow!(value)
+    }
+}
+
 pub struct CustomEncryption {
     keys: [u8; 64],
     pub decrypted: Option<Vec<CredsStructDTO>>,
     encrypted_bytes: Vec<u8>,
+}
+
+impl Default for CustomEncryption {
+    fn default() -> Self {
+        CustomEncryption::new()
+    }
 }
 
 impl CustomEncryption {
@@ -28,7 +52,7 @@ impl CustomEncryption {
     //     Self { keys: keys_bytes, decrypted: None, encrypted_bytes: encrypted_bytes }
     // }
 
-    pub fn encrypt(&self, plaintext: &[u8]) -> Vec<u8> {
+    pub fn encrypt(&mut self, plaintext: &[u8]) {
         let nonce1: [u8; 12] = random();
         let nonce2: [u8; 12] = random();
 
@@ -45,7 +69,7 @@ impl CustomEncryption {
             .encrypt(Nonce::<Aes256Gcm>::from_slice(&nonce2), &*encrypted1)
             .unwrap();
 
-        [nonce1.to_vec(), nonce2.to_vec(), encrypted2].concat()
+        self.encrypted_bytes = [nonce1.to_vec(), nonce2.to_vec(), encrypted2].concat();
     }
 
     pub fn create_keys() -> [u8; 64] {
@@ -96,14 +120,27 @@ impl CustomEncryption {
         self.decrypted = Some(value);
     }
 
-    pub fn read() -> Self {
-        let encrypted_bytes = fs::read("data.enc").unwrap_or_else(|err| {
+    pub fn new() -> Self {
+        // ! >> TODO >> Create a in memory data and again on new creation ask for saving old
+
+        Self {
+            keys: CustomEncryption::create_keys(),
+            decrypted: None,
+            encrypted_bytes: Vec::new(),
+        }
+    }
+
+    pub fn read() -> Result<Self> {
+        let data_path = CustomEncryption::open_file_dialog(EncryptorFileTypes::DataFile)?;
+
+        let encrypted_bytes = fs::read(data_path).unwrap_or_else(|err| {
             eprintln!("Failed to read data.enc {err}, using empty encrypted data");
             Vec::new()
         });
 
-        let key_file = fs::read("key.bin").unwrap_or_else(|err| {
-            eprintln!("No keys found , default to creating a new one");
+        let key_path = CustomEncryption::open_file_dialog(EncryptorFileTypes::KeyFile)?;
+        let key_file = fs::read(key_path).unwrap_or_else(|err| {
+            eprintln!("No keys found {err}, default to creating a new one");
             vec![]
         });
         let mut key_bytes = [0u8; 64]; // Creating a buffer to key bytes to add to..
@@ -116,16 +153,79 @@ impl CustomEncryption {
             key_bytes = key_file.try_into().unwrap();
         };
 
-        Self {
+        Ok(Self {
             keys: key_bytes,
             decrypted: None,
             encrypted_bytes: encrypted_bytes,
-        }
+        })
+    }
+
+    pub fn p_save_key(&self) {
+        CustomEncryption::save_key(&self.keys);
+    }
+
+    pub fn p_save_data(&self) {
+        CustomEncryption::save_data(&self);
     }
 
     fn save_key(bytes: &[u8]) {
-        let mut file = File::create_new("key.bin").expect("Failed to create key file");
+        let key_save_path = CustomEncryption::save_file_dialog(EncryptorFileTypes::KeyFile);
+        if let Ok(path) = key_save_path {
+            let mut file = File::create(path).expect("Failed to create key file");
+            let _ = file.write_all(bytes);
+            file.flush();
+        }
+    }
 
-        let _ = file.write_all(bytes);
+    fn save_data(&self) {
+        let save_path = CustomEncryption::save_file_dialog(EncryptorFileTypes::DataFile);
+        let Ok(dir) = save_path else {
+            return;
+        };
+
+        let mut file = File::create(dir).expect("Failed to create encrypted data file");
+        let _ = file.write_all(&self.encrypted_bytes);
+        file.flush();
+    }
+
+    fn open_file_dialog(file_type: EncryptorFileTypes) -> Result<PathBuf> {
+        let file_dialog = match file_type {
+            EncryptorFileTypes::DataFile => rfd::FileDialog::new()
+                .add_filter("enc", &["enc"])
+                .set_title("Select Data File .enc")
+                .pick_file(),
+            EncryptorFileTypes::KeyFile => rfd::FileDialog::new()
+                .add_filter("key", &["ckey"])
+                .set_title("Select Key file .ckey")
+                .pick_file(),
+        };
+        file_dialog.context("No Selection")
+    }
+    fn save_file_dialog(file_type: EncryptorFileTypes) -> Result<PathBuf> {
+        match file_type {
+            EncryptorFileTypes::DataFile => {
+                let data_save_path = rfd::FileDialog::new()
+                    .set_title("Select place to save the encrypted data file")
+                    .add_filter("enc", &["enc"])
+                    .save_file();
+                let result = match data_save_path {
+                    None => Err(EncrypterErrors::SavingError)?,
+                    Some(val) => Ok(val),
+                };
+                result
+            }
+            EncryptorFileTypes::KeyFile => {
+                let key_save_path = rfd::FileDialog::new()
+                    .set_title("Select place to save key file")
+                    .add_filter("keyfile", &["ckey"])
+                    .save_file();
+
+                let result = match key_save_path {
+                    None => Err(EncrypterErrors::SavingError)?,
+                    Some(val) => Ok(val),
+                };
+                result
+            }
+        }
     }
 }
