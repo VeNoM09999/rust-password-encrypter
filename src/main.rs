@@ -213,7 +213,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     AppLoadState::Update => {}
                     AppLoadState::Update_Key => {}
-                    AppLoadState::Saved => {}
+                    AppLoadState::Saved => {
+                        *app_state = AppLoadState::Update;
+                    }
                 }
                 let c2 = creds_cloned.clone();
                 let _ = slint::spawn_local(async move {
