@@ -1,24 +1,15 @@
-use anyhow::{Context, Result};
-use std::{
-    any,
-    fs::{self, File},
-    io::Write,
-    path::PathBuf,
-};
-
+use crate::CredsStructDTO;
 use aes_gcm::{
     Aes256Gcm, Key, KeyInit,
     aead::{Aead, Nonce},
 };
+use anyhow::{Context, Result};
 use rand::random;
-
-use crate::CredsStructDTO;
-
-// #[derive(Debug, Serialize, Deserialize)]
-// pub struct CustomData {
-//     pub key: String,
-//     pub value: String,
-// }
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::PathBuf,
+};
 
 enum EncryptorFileTypes {
     DataFile,
@@ -48,10 +39,6 @@ impl Default for CustomEncryption {
 }
 
 impl CustomEncryption {
-    // pub fn new(keys_bytes: [u8;64], encrypted_bytes:Vec<u8>) -> Self {
-    //     Self { keys: keys_bytes, decrypted: None, encrypted_bytes: encrypted_bytes }
-    // }
-
     pub fn encrypt(&mut self, plaintext: &[u8]) {
         let nonce1: [u8; 12] = random();
         let nonce2: [u8; 12] = random();
@@ -173,7 +160,7 @@ impl CustomEncryption {
         if let Ok(path) = key_save_path {
             let mut file = File::create(path).expect("Failed to create key file");
             let _ = file.write_all(bytes);
-            file.flush();
+            let _ = file.flush();
         }
     }
 
@@ -185,7 +172,7 @@ impl CustomEncryption {
 
         let mut file = File::create(dir).expect("Failed to create encrypted data file");
         let _ = file.write_all(&self.encrypted_bytes);
-        file.flush();
+        let _ = file.flush();
     }
 
     fn open_file_dialog(file_type: EncryptorFileTypes) -> Result<PathBuf> {
@@ -201,6 +188,7 @@ impl CustomEncryption {
         };
         file_dialog.context("No Selection")
     }
+
     fn save_file_dialog(file_type: EncryptorFileTypes) -> Result<PathBuf> {
         match file_type {
             EncryptorFileTypes::DataFile => {

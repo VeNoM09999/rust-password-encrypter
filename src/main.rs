@@ -1,4 +1,5 @@
-use creds_app_iced::AppLoadState;
+use arboard::Clipboard;
+use creds_app_iced::{AppLoadState, random_id};
 // #![allow(dead_code, unused_variables)]
 use serde::{Deserialize, Serialize};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
@@ -16,6 +17,8 @@ pub struct CredsState {
     pub has_been_edited: bool,
     pub encrypter: Mutex<CustomEncryption>,
     pub load_state: Mutex<AppLoadState>,
+    pub clipboard: Mutex<Option<Clipboard>>,
+    pub clipboard_data: Mutex<Option<String>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -40,18 +43,16 @@ impl From<&CredsStruct> for CredsStructDTO {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let old_encyption = CustomEncryption::read()
-        .map(|mut v| {
-            v.decrypt();
-            v
-        })
-        .unwrap_or_default();
+    let load_state = AppLoadState::NotSaved;
+    let old_encyption = CustomEncryption::default();
 
     // Business Atomic States
     let app_state = CredsState {
         has_been_edited: false,
         encrypter: Mutex::new(old_encyption),
-        load_state: Mutex::new(AppLoadState::InMemory),
+        load_state: Mutex::new(load_state),
+        clipboard: Mutex::new(Clipboard::new().ok()),
+        clipboard_data: Mutex::new(None),
     };
     let shared_state = Arc::new(app_state);
 
@@ -62,27 +63,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ui.global::<UIGlobal>()
         .set_creds(ModelRc::from(creds_modal.clone()));
 
+    ui.global::<UIGlobal>().invoke_load();
+
     {
-        // TODO >> FIX Save Logic as OverWrite
         ui.global::<UIGlobal>().on_save({
             let cloned = shared_state.clone();
             let ui_weak = ui.as_weak();
+            // Save (Clicked) -> Encrypt -> Save to disk
             move || {
-                if let Some(ui_strong) = ui_weak.upgrade() {
-                    let data = ui_strong.global::<UIGlobal>().get_creds();
-                    let creds: Vec<CredsStructDTO> =
-                        data.iter().map(|f| CredsStructDTO::from(&f)).collect();
+                let ui_handle = match ui_weak.upgrade() {
+                    None => return,
+                    Some(ui) => ui,
+                };
+                let data = ui_handle.global::<UIGlobal>().get_creds();
+                let creds: Vec<CredsStructDTO> =
+                    data.iter().map(|f| CredsStructDTO::from(&f)).collect();
 
-                    let serialized = serde_json::to_vec(&creds).unwrap();
+                if creds.len() == 0 {
+                    return;
+                }
 
-                    let mut encrypter = cloned
+                let serialized = match serde_json::to_vec(&creds) {
+                    Err(_e) => {
+                        eprintln!("Failed to serialize {}", _e);
+                        return;
+                    }
+                    Ok(val) => val,
+                };
+
+                let encrypter = {
+                    let mut enc = cloned
                         .encrypter
                         .lock()
                         .expect("Failed to get lock on encrypter");
+                    enc.encrypt(serialized.as_slice()); // As Slice of Bytes
+                    enc
+                };
 
-                    encrypter.encrypt(serialized.as_slice()); // As Slice of Bytes
-                    encrypter.p_save_key();
-                    encrypter.p_save_data();
+                let mut load_state = cloned.load_state.lock().unwrap();
+                match *load_state {
+                    AppLoadState::NotSaved => {
+                        encrypter.p_save_key();
+                        encrypter.p_save_data();
+                        *load_state = AppLoadState::Saved
+                    }
+                    AppLoadState::Saved => {
+                        // Skip
+                    }
+                    AppLoadState::Update => {
+                        encrypter.p_save_data();
+                        *load_state = AppLoadState::Saved
+                    }
+                    AppLoadState::Update_Key => {
+                        encrypter.p_save_key();
+                        encrypter.p_save_data();
+                        *load_state = AppLoadState::Saved
+                    }
                 }
             }
         });
@@ -91,19 +127,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.global::<UIGlobal>().on_load({
             let cloned_app_state = Arc::clone(&shared_state);
             let creds_model_clone = creds_modal.clone();
+            let ui_clone = ui.as_weak();
+            // OldValult -> Encrypt -> Save -> Load -> Decrypt -> Display on UI -> Update Global State
             move || {
+                let ui_handle = match ui_clone.upgrade() {
+                    None => return,
+                    Some(val) => val,
+                };
+                ui_handle.global::<UIGlobal>().invoke_save();
+
                 let new_encrypter = CustomEncryption::read()
                     .map(|mut encrypter| {
                         encrypter.decrypt();
+                        *cloned_app_state.load_state.lock().unwrap() = AppLoadState::Saved;
                         encrypter
                     })
-                    .map_err(|_e| CustomEncryption::new());
+                    .unwrap_or_default();
 
                 let mut old_encryptor = cloned_app_state.encrypter.lock().unwrap();
-                let new_encrypter = match new_encrypter {
-                    Err(en) => en,
-                    Ok(en) => en,
-                };
                 *old_encryptor = new_encrypter;
 
                 if let Some(decrypted) = &old_encryptor.decrypted {
@@ -111,7 +152,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .iter()
                         .map(|f| CredsStruct {
                             email_username: f.email_username.clone().into(),
-                            id: f.id.clone().into(),
+                            id: random_id(10).into(),
                             name: f.name.clone().into(),
                             password: f.password.clone().into(),
                             website_url: f.website_url.clone().into(),
@@ -125,9 +166,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     {
         ui.global::<UIGlobal>().on_cb_copy({
-            let cloned = Arc::clone(&shared_state);
+            let cloned_app_state = Arc::clone(&shared_state);
+            let ui_weak = ui.as_weak();
             move |id: SharedString| {
                 println!("Id to copy password for : {id}");
+                let ui_handle = match ui_weak.upgrade() {
+                    None => return,
+                    Some(val) => val,
+                };
+                let data = ui_handle.global::<UIGlobal>().get_creds();
+                if let Some(creds) = data.iter().find(|v| v.id == id) {
+                    println!("{}", creds.password);
+                    // TODO Copy to clipboard here
+                    if let Some(ref mut clipboard) = *cloned_app_state.clipboard.lock().unwrap() {
+                        let mut data_lock = cloned_app_state.clipboard_data.lock().unwrap();
+                        *data_lock = Some(creds.password.to_string().clone());
+                        match clipboard.set_text(data_lock.as_ref().unwrap().clone()) {
+                            Err(_e) => {
+                                eprintln!("{}", _e);
+                            }
+                            Ok(()) => {
+                                println!("Password copied!");
+                            }
+                        }
+                    }
+                } else {
+                    println!("Password  not found");
+                };
             }
         });
     }
@@ -135,12 +200,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         ui.global::<UIGlobal>().on_add_new_entry({
             let creds_cloned = creds_modal.clone();
-            // let cloned = Arc::clone(&shared_state);
+            let cloned = Arc::clone(&shared_state);
             move |entry| {
-                // let ui_handle = ui_handle.clone();
                 println!("{entry:#?}");
                 if entry.email_username.is_empty() && entry.password.is_empty() {
                     return;
+                }
+                let mut app_state = cloned.load_state.lock().unwrap();
+                match *app_state {
+                    AppLoadState::NotSaved => {
+                        *app_state = AppLoadState::Update_Key;
+                    }
+                    AppLoadState::Update => {}
+                    AppLoadState::Update_Key => {}
+                    AppLoadState::Saved => {}
                 }
                 let c2 = creds_cloned.clone();
                 let _ = slint::spawn_local(async move {
@@ -153,21 +226,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         ui.global::<UIGlobal>().on_new_vault({
             let cloned_app_state = Arc::clone(&shared_state);
+            let creds_model_clone = creds_modal.clone();
+            let ui_clone = ui.as_weak();
+
             move || {
-                let load_state = cloned_app_state.load_state.lock().unwrap();
-                match *load_state {
-                    AppLoadState::InMemory => {
-                        let mut encrypter = cloned_app_state.encrypter.lock().unwrap();
-                        encrypter.p_save_key();
-                        encrypter.p_save_data();
-                        let new_encrypter_state = CustomEncryption::new();
+                if let Some(ui_window) = ui_clone.upgrade() {
+                    // Invoke Save Callback
+                    ui_window.global::<UIGlobal>().invoke_save();
+                    // Creating a In-Memory Vault
+                    let new_encrypter_state = CustomEncryption::default();
+                    creds_model_clone.clear();
+                    *cloned_app_state.load_state.lock().unwrap() = AppLoadState::NotSaved;
 
-                        *encrypter = new_encrypter_state;
-                    }
-
-                    AppLoadState::OnDisk => {
-                        //  TODO >> Implement Overwriting encrypted data to disk
-                    }
+                    let mut encrypter = cloned_app_state.encrypter.lock().unwrap();
+                    *encrypter = new_encrypter_state;
                 }
             }
         });

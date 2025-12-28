@@ -70,7 +70,7 @@ component CredsComponent inherits ListView {
         }
 
         Text {
-            text: item.password;
+            text: item.website-url;
         }
     }
 }
@@ -154,6 +154,6 @@ export component AppWindow inherits MaterialWindow {
     }
 
     modal := ModalWindow {
-        visible: true;
+        visible: false;
     }
 }
